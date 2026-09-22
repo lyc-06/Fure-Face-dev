@@ -1,233 +1,125 @@
-# Fure-Face (映美) — 面部美学分析与智能推荐平台
+# Fure-Face（映美）
 
-Fure-Face 是一个基于深度学习与计算机视觉的面部美学分析平台，专注于为用户提供**面部比例分析**、**对称性评估**、**医美方案推荐**及**AI 智能问答**等服务。系统采用前后端分离架构，前端为单页面应用，后端基于 Spring Cloud 微服务体系。
+面向面部美学分析与智能推荐的前后端分离平台。用户上传人脸照片后，可以获得面部特征分析、相似度比对、医美方案参考和 AI 咨询服务。
 
-## 系统架构
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  Frontend (SPA)                       │
-│   Vue 3 + Element Plus + Pinia + 纯 HTML/CSS/JS      │
-└──────────────┬──────────────────────────────────────┘
-               │ HTTP / SSE
-┌──────────────▼──────────────────────────────────────┐
-│             API Gateway (facefure-gateway)            │
-│           Port 9000 · 路由 · 鉴权 · 限流 · CORS          │
-└────┬──────┬──────┬──────┬──────┬──────────────────────┘
-     │      │      │      │      │
-┌────▼─┐ ┌─▼───┐ ┌▼────┐ ┌▼────┐ ┌▼──────────┐
-│ Auth │ │User │ │Face │ │ AI  │ │  Common    │
-│ 认证  │ │ 用户  │ │ 人脸  │ │ 智能  │ │  公共模块   │
-│ 服务  │ │ 服务  │ │ 服务  │ │ 对话  │ │ (工具/配置) │
-└──────┘ └─────┘ └─────┘ └─────┘ └───────────┘
-```
-
-## 技术栈
-
-### 后端
-
-| 组件 | 技术 |
-|------|------|
-| 基础框架 | Spring Boot 3.2.0 · Java 21 |
-| 微服务 | Spring Cloud 2023.0.0 · Nacos (注册/配置) |
-| 网关 | Spring Cloud Gateway 3.x |
-| ORM | MyBatis-Plus 3.5.4 |
-| 数据库 | MySQL · Flyway (迁移) |
-| 缓存 | Redis |
-| 对象存储 | MinIO |
-| 消息/邮件 | JavaMail · Thymeleaf 模板 |
-| AI 对接 | OpenAI SDK (兼容 DeepSeek / 豆包 API) |
-| 计算机视觉 | OpenCV (JavaCV) — 人脸检测 · LBPH 识别 |
-| 安全 | Spring Security · BCrypt · JWT (jjwt) |
-| 文档 | Knife4j (Swagger 3) |
-| 工具 | Lombok · MapStruct · Hutool · Jackson |
-
-### 前端
-
-| 组件 | 技术 |
-|------|------|
-| 框架 | Vue 3 (CDN + UMD) |
-| UI 库 | Element Plus |
-| 状态管理 | Pinia |
-| 图标 | Font Awesome 6 |
-| HTTP | Fetch API (原生) |
-| AI 对接 | 豆包视觉大模型 · DeepSeek Chat API |
-| 样式 | 纯 CSS · 深色/浅色双主题 |
-
-## 项目结构
-
-```
-├── frontend/                            # 前端应用
-│   ├── index.html                       # 主页面 (SPA)
-│   ├── main.js                          # 核心逻辑 (Vue 3 setup)
-│   ├── style.css                        # 全局样式 (含双主题)
-│   ├── assets/                          # 静态资源
-│   │   ├── simulation/                  # 展示图片
-│   │   ├── guide-front.jpg / guide-side.jpg
-│   │   └── 默认头像.jpeg
-│   └── src/
-│       ├── api/                         # 接口封装
-│       │   ├── user.js
-│       │   ├── face.js
-│       │   └── chat.js
-│       ├── stores/user.js               # Pinia 状态
-│       ├── utils/request.js             # 请求工具
-│       └── views/                       # Vue 组件
-│           ├── ai-chat/index.vue
-│           └── face/
-│               ├── detection/index.vue
-│               └── comparison/index.vue
-│
-├── backend/                             # 后端 (Maven 多模块)
-│   ├── pom.xml                          # 父 POM
-│   │
-│   ├── facefure-common/                 # 公共模块
-│   │   ├── config/                      # Redis · MinIO · SMS · CORS 配置
-│   │   ├── constants/Constants.java     # 全局常量
-│   │   ├── exception/                   # 统一异常处理
-│   │   ├── model/Result.java            # 统一响应体
-│   │   ├── service/                     # 邮件 / 短信服务
-│   │   └── utils/                       # JWT · Redis · Security 工具
-│   │
-│   ├── facefure-auth/                   # 认证模块
-│   │   ├── controller/AuthController    # 登录 / 注册 / 验证码 / Token 刷新
-│   │   ├── service/AuthService          # 认证逻辑
-│   │   └── config/SecurityConfig        # Spring Security 配置
-│   │
-│   ├── facefure-user/                   # 用户模块
-│   │   ├── controller/UserController    # 用户 CRUD · 头像 · 密码 · 绑定管理
-│   │   └── service/UserService          # 业务逻辑
-│   │
-│   ├── facefure-face/                   # 人脸服务模块
-│   │   ├── config/OpenCVConfig          # LBPH 识别器 · Cascade 分类器
-│   │   ├── service/FaceDetection        # 人脸检测
-│   │   └── service/FaceComparison       # 人脸比对 (余弦相似度)
-│   │
-│   ├── facefure-ai/                     # AI 对话模块
-│   │   ├── controller/AIChatController  # 会话管理 · 消息 (SSE 流式)
-│   │   └── service/AIModelService       # OpenAI SDK 对接
-│   │
-│   └── facefure-gateway/               # 网关模块
-│       ├── config/GatewayConfig          # CORS · IP 限流
-│       └── filter/AuthenticationFilter  # JWT 鉴权全局过滤器
-│
-└── test/                                # 功能原型 / Demo
-    ├── index.html                       # 照片上传 + 分析结果展示
-    ├── login.html                       # 独立登录页
-    ├── register.html                    # 独立注册页
-    ├── assets/                          # 测试用图片
-    ├── styles/                          # 测试用样式
-    └── script/                          # 测试用脚本
-```
+> 本项目的分析结果和医美建议仅供信息参考，不构成医疗诊断或治疗意见。
 
 ## 核心功能
 
-### 1. 人脸检测与分析
-- 基于 OpenCV `CascadeClassifier` 检测人脸区域
-- LBPH 算法提取面部特征向量
-- 分析结果持久化至数据库，图片上传至 MinIO
-- 支持按用户权限管理检测记录
+- **面部分析**：检测人脸，分析面部比例、对称性和肤质等特征。
+- **人脸比对**：对两张人脸进行特征比对并输出相似度结果。
+- **智能咨询**：支持文本和图片分析，提供医美领域 AI 问答及流式对话。
+- **方案推荐**：根据分析结果展示分级医美方案，支持术前术后对比和年龄模拟。
+- **账户管理**：支持注册登录、验证码、个人资料、头像、密码及手机号/邮箱管理。
+- **平台能力**：提供 JWT 鉴权、接口限流、历史记录、深色/浅色主题和中英文切换。
 
-### 2. 人脸比对
-- 计算两张人脸特征向量的余弦相似度
-- 相似度 > 0.8 判定为同一人
-- 支持查看历史比对记录
+## 技术概览
 
-### 3. 面部美学评估
-- **面部比例分析**：三庭五眼、黄金比例偏差评估
-- **对称性分析**：眼睛、鼻子、嘴部局部及整体对称度
-- **肤质分析**：水分含量、弹性指数、肤色均匀度
-- **个性化医美建议**：非手术类与手术类方案推荐
+- **前端**：Vue 3、Element Plus、Pinia、原生 Fetch、CSS
+- **后端**：Java 21、Spring Boot、Spring Cloud、MyBatis-Plus
+- **基础设施**：MySQL、Redis、Nacos、MinIO、Flyway
+- **AI 与视觉**：OpenCV/JavaCV、OpenAI 兼容接口、DeepSeek、豆包视觉模型
 
-### 4. AI 智能助手
-- 集成 DeepSeek Chat API（原生 JS 侧调用）
-- 集成豆包视觉大模型（面部照片分析）
-- 后端 SSE 流式对话（OpenAI SDK）
-- 医疗美容领域专业问答
+## 项目结构
 
-### 5. 医美方案展示
-- 轻微/中度/重度三级方案分类
-- 术前术后的 **before/after 翻转对比**
-- 年龄模拟功能 (25 / 35 / 50 / 70 岁)
+```text
+frontend/       前端单页面应用、接口封装和页面组件
+backend/        Maven 多模块后端：认证、用户、人脸、AI、网关和公共模块
+test/           独立功能原型和演示页面
+```
 
-### 6. 用户管理
-- 注册 / 登录（密码 + 验证码双模式）
-- 头像裁剪上传 / 昵称 / 性别 / 密码修改
-- 手机号 & 邮箱的绑定 / 换绑
-- 忘记密码流程（3 步找回）
-- 管理员用户搜索、状态管理
+## 快速开始
 
-### 7. 系统特性
-- 中英文双语切换
-- 深色 / 浅色双主题
-- JWT 令牌认证 + Token 刷新
-- API 网关统一鉴权与 IP 限流
-- 统一异常处理与标准响应体
-
-## 快速启动
-
-### 前置依赖
+### 环境要求
 
 - JDK 21+
 - Maven 3.8+
 - MySQL 8.0+
 - Redis 7+
 - Nacos 2.x
-- MinIO (对象存储)
+- MinIO
 
 ### 启动后端
 
+1. 创建数据库：
+
 ```bash
-# 1. 初始化数据库
-mysql -u root -p < facefure-user/src/main/resources/db/migration/V1__create_user_table.sql
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS facefure DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
 
-# 2. 启动 Nacos、Redis、MinIO
+2. 启动 Nacos、Redis 和 MinIO，并在 MinIO 中创建 `facefure` bucket。
 
-# 3. 修改各模块 application.yml 中的数据库 / Redis / MinIO / Nacos 配置
+3. 修改各模块的 `application*.yml`，配置数据库、Redis、Nacos、MinIO、邮件、短信和 AI 服务。配置文件中的 `xxxxxxxxxx` 和 `your-secret-key` 都是占位值，不能直接用于生产环境。
 
-# 4. 编译并启动
+4. 编译并启动服务：
+
+```bash
 cd backend
 mvn clean install -DskipTests
-# 按需启动各模块：gateway → auth → user → face → ai
 ```
+
+在独立终端中按以下顺序启动：
+
+```bash
+mvn -pl facefure-auth spring-boot:run
+mvn -pl facefure-user spring-boot:run
+mvn -pl facefure-face spring-boot:run
+mvn -pl facefure-ai spring-boot:run
+mvn -pl facefure-gateway spring-boot:run
+```
+
+默认端口：网关 `9000`，认证服务 `8081`，用户服务 `9002`，AI 服务 `9003`；人脸服务端口以其模块配置为准。
 
 ### 启动前端
 
 ```bash
-# 直接打开 frontend/index.html 即可
-# 或使用任意 HTTP 服务器:
 cd frontend
 python -m http.server 8080
 ```
 
-## 接口概览
+访问 `http://localhost:8080`。生产环境可使用 Nginx 等静态文件服务器托管 `frontend/`，并将 API 请求代理到网关 `http://localhost:9000`。
 
-| 路径 | 模块 | 说明 |
-|------|------|------|
-| `POST /api/v1/auth/login` | auth | 登录 |
-| `POST /api/v1/auth/register` | auth | 注册 |
-| `POST /api/v1/auth/code/send` | auth | 发送验证码 |
-| `POST /api/v1/auth/token/refresh` | auth | 刷新 Token |
-| `GET /api/v1/user/info` | user | 获取用户信息 |
-| `PUT /api/v1/user/info` | user | 更新用户信息 |
-| `POST /api/v1/user/avatar` | user | 上传头像 |
-| `PUT /api/v1/user/password` | user | 修改密码 |
-| `POST /api/v1/user/phone/bind` | user | 绑定手机号 |
-| `POST /api/v1/user/email/bind` | user | 绑定邮箱 |
-| `POST /api/v1/ai/chat/message` | ai | AI 聊天 |
-| `POST /api/v1/ai/chat/message/stream` | ai | AI 流式聊天 |
-| `POST /api/v1/ai/chat/session` | ai | 创建会话 |
-| `POST /api/v1/face/detect` | face | 人脸检测 |
-| `POST /api/v1/face/compare` | face | 人脸比对 |
+## 部署配置
 
-详情以 Swagger 文档为准（启动后访问 `http://localhost:9000/swagger-ui/`）。
+运行完整系统需要以下外部服务：
 
-## 会话历史
+- **MySQL**：数据库名为 `facefure`。用户和 AI 模块启用 Flyway 后，会自动执行各自 `db/migration` 目录中的迁移脚本。
+- **Redis**：认证、用户、AI 和网关限流依赖 Redis，默认地址为 `localhost:6379`。
+- **Nacos**：用于服务注册和配置管理，默认地址为 `localhost:8848`。
+- **MinIO**：用于保存头像和人脸相关图片，bucket 名称为 `facefure`。
+- **邮件/短信**：用户验证码功能需要 QQ SMTP 和阿里云短信配置。
+- **AI 服务**：AI 模块需要 OpenAI 兼容接口的 API key；前端使用的 DeepSeek、豆包等密钥也需要单独配置。
 
+生产环境请使用环境变量或外部配置中心管理密钥，不要把数据库密码、JWT 密钥、邮箱密码、短信凭据、API key 或 MinIO 密钥提交到 Git。生产部署还应启用 HTTPS、限制 CORS 来源、关闭调试日志，并为各基础设施服务设置独立账号和强密码。
+
+## 接口文档
+
+后端启动后，可通过 Swagger/Knife4j 查看接口详情：
+
+```text
+http://localhost:9000/swagger-ui/
 ```
-a1d4793 灵感demo
-d366ce9 最终版本
-89091e2 add register alert
-4355e42 optimize "Age simulation" section
-77f761b add HTML redirection for login and register pages
+
+主要接口包括登录注册、用户信息、头像上传、AI 对话、人脸检测和人脸比对，具体请求参数以在线接口文档为准。
+
+## 已知限制
+
+- `backend/pom.xml` 当前声明了 `facefure-api` 子模块，但仓库中没有对应目录；需要补充该模块或从父 POM 的 `<modules>` 中移除声明后再执行完整 Maven 构建。
+- AI 能力依赖第三方服务，模型、额度、接口兼容性和输出内容由服务商决定。
+- 人脸结果受图片质量、光照、姿态和模型能力影响，不应作为唯一决策依据。
+- 人脸图片、面部特征和用户资料属于敏感信息，部署方应自行落实访问控制、保留期限和删除机制。
+
+## 开发与贡献
+
+提交代码前建议执行：
+
+```bash
+cd backend
+mvn clean verify
 ```
+
+提交 Issue 或 Pull Request 时，请提供运行环境、复现步骤、预期结果和实际结果，并对人脸图片、账号信息和 API 密钥进行脱敏。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。第三方依赖、字体、图标、图片、模型和外部 API 可能受其各自许可证或服务条款约束，请分别确认授权范围。
